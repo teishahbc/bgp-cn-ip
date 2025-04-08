@@ -1,13 +1,14 @@
-# filter_ips.py
 import requests
 import sys
 import os
 from datetime import datetime
 
 # --- Configuration ---
-TARGET_ASNS = {4134, 56040}  # AS4134 (Chinanet), AS56040 (China Mobile)
+TARGET_ASNS_PRIMARY = {4134, 56040}  # AS4134 (Chinanet), AS56040 (China Mobile)
+TARGET_ASNS_SECONDARY = {4134, 9808, 4837, 4812, 24400, 17621, 4808, 56046, 56048, 56040, 17816, 17622, 56041, 24444, 56044, 24445, 56047, 24547, 38019}
 BGP_TABLE_URL = "https://bgp.tools/table.txt"
-OUTPUT_FILENAME = "cn_as4134_as56040_ipv4.txt"
+OUTPUT_FILENAME_PRIMARY = "cn_as4134_as56040_ipv4.txt"
+OUTPUT_FILENAME_SECONDARY = "cn_other_asns_ipv4.txt"
 
 # --- CRITICAL CONFIGURATION ---
 # User-Agent set according to user request.
@@ -19,21 +20,12 @@ def is_ipv4_cidr(cidr_string):
     """Checks if a CIDR string looks like IPv4 (contains a period and no colon)."""
     return '.' in cidr_string and ':' not in cidr_string
 
-def fetch_and_filter():
+def fetch_and_filter(target_asns):
     """Fetches bgp.tools table.txt data and filters for target ASNs/IPv4."""
-    print(f"Fetching data from {BGP_TABLE_URL}...")
+    print(f"Fetching data from {BGP_TABLE_URL} for ASNs: {target_asns}...")
     # Use the configured User-Agent
     headers = {'User-Agent': USER_AGENT}
     filtered_cidrs = set() # Use a set to avoid duplicates
-
-    # --- Optional User-Agent Placeholder Check ---
-    # You might want to keep this check *during development* if you switch emails,
-    # but since you explicitly set 'no@thankyou.com', the original placeholder check isn't needed.
-    # You could add a check for the generic placeholders if you copied old code:
-    if "YOUR_USERNAME" in USER_AGENT or "YOUR_REPO" in USER_AGENT or "your-contact@example.com" in USER_AGENT:
-         print("\nFATAL ERROR: Generic placeholder detected in USER_AGENT. Please review.", file=sys.stderr)
-         sys.exit(1)
-    # --- End User-Agent Placeholder Check ---
 
     try:
         response = requests.get(BGP_TABLE_URL, headers=headers, timeout=180, stream=True)
@@ -62,7 +54,7 @@ def fetch_and_filter():
                                 print(f"Warning: Could not parse ASN '{asn_str}' from line: {line}", file=sys.stderr)
                             continue
 
-                        if asn in TARGET_ASNS and is_ipv4_cidr(cidr):
+                        if asn in target_asns and is_ipv4_cidr(cidr):
                             filtered_cidrs.add(cidr)
                     else:
                         # Log only first few errors
@@ -77,7 +69,7 @@ def fetch_and_filter():
                     print(f"Warning: Error processing line: {line_bytes.decode('utf-8', errors='ignore')}: {e}", file=sys.stderr)
 
         print(f"Finished processing {processed_lines} lines.")
-        print(f"Found {len(filtered_cidrs)} unique matching IPv4 CIDRs for ASNs {TARGET_ASNS}.")
+        print(f"Found {len(filtered_cidrs)} unique matching IPv4 CIDRs for ASNs {target_asns}.")
 
     except requests.exceptions.RequestException as e:
         print(f"Fatal: Error fetching data from {BGP_TABLE_URL}: {e}", file=sys.stderr)
@@ -90,12 +82,12 @@ def fetch_and_filter():
 
     return sorted(list(filtered_cidrs))
 
-def write_output(cidrs, filename):
+def write_output(cidrs, filename, target_asns):
     """Writes the list of CIDRs to the output file with headers."""
     print(f"Writing {len(cidrs)} CIDRs to {filename}...")
     try:
         with open(filename, 'w') as f:
-            f.write(f"# IPv4 CIDRs for ASNs {', '.join(map(str, TARGET_ASNS))} (China Telecom/China Mobile)\n")
+            f.write(f"# IPv4 CIDRs for ASNs {', '.join(map(str, target_asns))}\n")
             f.write(f"# Data sourced from bgp.tools ({BGP_TABLE_URL})\n")
             f.write(f"# Last updated: {datetime.utcnow().isoformat()}Z\n")
             f.write("# WARNING: ASN Geo-location is not always precise. This list is based on ASN registration only.\n")
@@ -108,14 +100,18 @@ def write_output(cidrs, filename):
         sys.exit(1) # Exit with error code if file write fails
 
 if __name__ == "__main__":
-    output_path = OUTPUT_FILENAME
-    # Fetch and filter the data
-    filtered_data = fetch_and_filter()
-
-    if filtered_data:
-        write_output(filtered_data, output_path)
+    # Fetch and filter the data for primary ASNs
+    filtered_data_primary = fetch_and_filter(TARGET_ASNS_PRIMARY)
+    if filtered_data_primary:
+        write_output(filtered_data_primary, OUTPUT_FILENAME_PRIMARY, TARGET_ASNS_PRIMARY)
     else:
-        print("No matching CIDRs found or data fetch issue occurred. Output file will not be updated.")
-        pass # Exit successfully, GitHub Action won't commit if file is unchanged
+        print(f"No matching CIDRs found or data fetch issue occurred for ASNs {TARGET_ASNS_PRIMARY}. Output file will not be updated.")
+
+    # Fetch and filter the data for secondary ASNs
+    filtered_data_secondary = fetch_and_filter(TARGET_ASNS_SECONDARY)
+    if filtered_data_secondary:
+        write_output(filtered_data_secondary, OUTPUT_FILENAME_SECONDARY, TARGET_ASNS_SECONDARY)
+    else:
+        print(f"No matching CIDRs found or data fetch issue occurred for ASNs {TARGET_ASNS_SECONDARY}. Output file will not be updated.")
 
     print("Script finished.")
