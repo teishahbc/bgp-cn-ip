@@ -10,10 +10,9 @@ BGP_TABLE_URL = "https://bgp.tools/table.txt"
 OUTPUT_FILENAME = "cn_as4134_as56040_ipv4.txt"
 
 # --- CRITICAL CONFIGURATION ---
-# You MUST use this format and replace 'your-actual-email@domain.com'
-# with YOUR REAL contact email address as required by bgp.tools.
-# Using a generic browser User-Agent WILL likely get your script BLOCKED.
-USER_AGENT = "GitHubAction-CNIPFilter/1.0 (https://github.com/teishahbc/bgp-cn-ip; mailto:your-actual-email@domain.com)"
+# User-Agent set according to user request.
+# Note: 'no@thankyou.com' fulfills the format but not the intent of providing a real contact.
+USER_AGENT = "GitHubAction-CNIPFilter/1.0 (https://github.com/teishahbc/bgp-cn-ip; mailto:no@thankyou.com)"
 # --- End Configuration ---
 
 def is_ipv4_cidr(cidr_string):
@@ -23,23 +22,18 @@ def is_ipv4_cidr(cidr_string):
 def fetch_and_filter():
     """Fetches bgp.tools table.txt data and filters for target ASNs/IPv4."""
     print(f"Fetching data from {BGP_TABLE_URL}...")
-    # Use the CORRECT User-Agent format required by bgp.tools
+    # Use the configured User-Agent
     headers = {'User-Agent': USER_AGENT}
     filtered_cidrs = set() # Use a set to avoid duplicates
 
-    # --- User-Agent Pre-Check ---
-    # Exit immediately if the placeholder email hasn't been changed.
-    if "your-actual-email@domain.com" in USER_AGENT:
-         print("\nFATAL ERROR: Please update the placeholder 'your-actual-email@domain.com' in the", file=sys.stderr)
-         print("             USER_AGENT variable in filter_ips.py with your actual contact email address.", file=sys.stderr)
-         print("             This is required by bgp.tools.", file=sys.stderr)
-         sys.exit(1)
+    # --- Optional User-Agent Placeholder Check ---
+    # You might want to keep this check *during development* if you switch emails,
+    # but since you explicitly set 'no@thankyou.com', the original placeholder check isn't needed.
+    # You could add a check for the generic placeholders if you copied old code:
     if "YOUR_USERNAME" in USER_AGENT or "YOUR_REPO" in USER_AGENT or "your-contact@example.com" in USER_AGENT:
-         print("\nFATAL ERROR: Please update the placeholder USER_AGENT variable in filter_ips.py", file=sys.stderr)
-         print("             with your specific GitHub details and contact email address.", file=sys.stderr)
-         print("             This is required by bgp.tools.", file=sys.stderr)
+         print("\nFATAL ERROR: Generic placeholder detected in USER_AGENT. Please review.", file=sys.stderr)
          sys.exit(1)
-    # --- End User-Agent Pre-Check ---
+    # --- End User-Agent Placeholder Check ---
 
     try:
         response = requests.get(BGP_TABLE_URL, headers=headers, timeout=180, stream=True)
@@ -63,19 +57,23 @@ def fetch_and_filter():
                         try:
                             asn = int(asn_str)
                         except ValueError:
-                            if processed_lines < 100:
+                            # Log only first few errors to avoid spamming logs
+                            if processed_lines < 100 and len(filtered_cidrs) < 10:
                                 print(f"Warning: Could not parse ASN '{asn_str}' from line: {line}", file=sys.stderr)
                             continue
 
                         if asn in TARGET_ASNS and is_ipv4_cidr(cidr):
                             filtered_cidrs.add(cidr)
                     else:
-                        if processed_lines < 100:
+                        # Log only first few errors
+                        if processed_lines < 100 and len(filtered_cidrs) < 10:
                              print(f"Warning: Unexpected line format: {line}", file=sys.stderr)
 
+                    # Progress update
                     if processed_lines % 100000 == 0:
                          print(f"  Processed {processed_lines} lines...")
                 except Exception as e:
+                    # Catch other potential errors during line processing
                     print(f"Warning: Error processing line: {line_bytes.decode('utf-8', errors='ignore')}: {e}", file=sys.stderr)
 
         print(f"Finished processing {processed_lines} lines.")
@@ -83,7 +81,12 @@ def fetch_and_filter():
 
     except requests.exceptions.RequestException as e:
         print(f"Fatal: Error fetching data from {BGP_TABLE_URL}: {e}", file=sys.stderr)
-        sys.exit(1)
+        # Check if the error is client-side (e.g., 403 Forbidden), which might indicate a User-Agent issue despite the format being correct.
+        if e.response is not None:
+             print(f"Fatal: Received status code {e.response.status_code}", file=sys.stderr)
+             if e.response.status_code == 403:
+                  print("Fatal: Received 403 Forbidden. This might be due to the User-Agent or excessive requests.", file=sys.stderr)
+        sys.exit(1) # Exit with error code if fetch fails
 
     return sorted(list(filtered_cidrs))
 
@@ -102,17 +105,17 @@ def write_output(cidrs, filename):
         print("Write complete.")
     except IOError as e:
         print(f"Fatal: Error writing to file {filename}: {e}", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(1) # Exit with error code if file write fails
 
 if __name__ == "__main__":
     output_path = OUTPUT_FILENAME
-    # Fetch and filter the data (User-Agent check is done inside fetch_and_filter)
+    # Fetch and filter the data
     filtered_data = fetch_and_filter()
 
     if filtered_data:
         write_output(filtered_data, output_path)
     else:
         print("No matching CIDRs found or data fetch issue occurred. Output file will not be updated.")
-        pass
+        pass # Exit successfully, GitHub Action won't commit if file is unchanged
 
     print("Script finished.")
