@@ -1,0 +1,54 @@
+# .github/workflows/update_cn_ips.yml
+name: Update CN ASN IP List
+
+on:
+  workflow_dispatch: # Allows manual triggering
+  schedule:
+    # Runs daily at 05:00 UTC. Adjust as needed.
+    # Be mindful of bgp.tools' note about caching (don't run too frequently)
+    - cron: '0 5 * * *'
+
+jobs:
+  update-list:
+    runs-on: ubuntu-latest
+    permissions:
+      # Required to push changes back to the repo
+      contents: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x' # Use a recent Python 3 version
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
+
+      - name: Run IP filter script
+        run: python filter_ips.py # Assumes script is in the repo root
+
+      - name: Commit and push if changes exist
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          # Add the potential output file
+          git add cn_as4134_as56040_ipv4.txt
+          # Check if there are changes staged
+          # The 'exit 1' will fail the step if there are NO changes (git diff --quiet exits 0 if no changes)
+          # We invert this logic: if 'git diff' finds changes (exits 1), we continue. If it finds no changes (exits 0), we exit the script successfully.
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+            exit 0 # Exit successfully, no push needed
+          fi
+          # If we reach here, there are changes
+          echo "Changes detected. Committing..."
+          git commit -m "Automated update of CN ASN IP list ($(date -u +'%Y-%m-%d'))"
+          echo "Pushing changes..."
+          git push
+        env:
+          # This token is automatically provided by GitHub Actions
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
