@@ -1,6 +1,6 @@
-# IPv4 CIDRs for ASNs 56040, 4134 (China Telecom/China Mobile)
+# IPv4 CIDRs for ASNs 56040, 4134
 # Data sourced from bgp.tools (https://bgp.tools/table.txt)
-# Last updated: 2025-04-08T12:26:57.086397Z
+# Last updated: 2025-04-08T12:46:33.614158Z
 # WARNING: ASN Geo-location is not always precise. This list is based on ASN registration only.
 #-----------------------------------------------------------
 1.180.0.0/14
