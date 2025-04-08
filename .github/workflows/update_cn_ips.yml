@@ -1,5 +1,5 @@
 # .github/workflows/update_cn_ips.yml
-name: Update CN ASN IP List
+name: Update CN ASN IP Lists
 
 on:
   workflow_dispatch: # Allows manual triggering
@@ -35,20 +35,27 @@ jobs:
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          # Add the potential output file
-          git add cn_as4134_as56040_ipv4.txt
+
+          # Add BOTH potential output files
+          # Use || true to prevent failure if a file doesn't exist (e.g., fetch failed for one set)
+          git add cn_as4134_as56040_ipv4.txt || true
+          git add cn_other_asns_ipv4.txt || true
+
           # Check if there are changes staged
-          # The 'exit 1' will fail the step if there are NO changes (git diff --quiet exits 0 if no changes)
-          # We invert this logic: if 'git diff' finds changes (exits 1), we continue. If it finds no changes (exits 0), we exit the script successfully.
+          # If 'git diff --staged --quiet' exits 0, there are no staged changes.
           if git diff --staged --quiet; then
-            echo "No changes to commit."
-            exit 0 # Exit successfully, no push needed
+            echo "No changes detected in generated IP lists."
+            exit 0 # Exit successfully, no commit/push needed
           fi
-          # If we reach here, there are changes
+
+          # If we reach here, there are staged changes
           echo "Changes detected. Committing..."
-          git commit -m "Automated update of CN ASN IP list ($(date -u +'%Y-%m-%d'))"
+          # Updated commit message to reflect multiple lists
+          git commit -m "Automated update of CN ASN IP lists ($(date -u +'%Y-%m-%d'))"
+
           echo "Pushing changes..."
           git push
+
         env:
           # This token is automatically provided by GitHub Actions
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
