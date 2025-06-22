@@ -4,7 +4,7 @@ name: Update CN ASN IP Lists
 on:
   workflow_dispatch: # Allows manual triggering
   schedule:
-    # Runs daily at 05:00 UTC. Adjust as needed.
+    # Runs daily at 17:00 UTC. Adjust as needed.
     # Be mindful of bgp.tools' note about caching (don't run too frequently)
     - cron: '0 17 * * *'
 
