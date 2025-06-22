@@ -6,7 +6,7 @@ on:
   schedule:
     # Runs daily at 05:00 UTC. Adjust as needed.
     # Be mindful of bgp.tools' note about caching (don't run too frequently)
-    - cron: '0 5 * * *'
+    - cron: '0 17 * * *'
 
 jobs:
   update-list:
