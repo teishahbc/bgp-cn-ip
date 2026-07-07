@@ -1,6 +1,6 @@
 # IPv4 CIDRs for ASNs 4134, 56040
 # Data sourced from bgp.tools (https://bgp.tools/table.txt)
-# Last updated: 2026-07-06T18:51:25.298274Z
+# Last updated: 2026-07-07T18:55:28.035091Z
 # WARNING: ASN Geo-location is not always precise. This list is based on ASN registration only.
 #-----------------------------------------------------------
 1.180.0.0/14
@@ -782,6 +782,7 @@
 183.240.96.0/21
 183.64.0.0/13
 183.78.180.0/22
+183.91.37.0/24
 183.91.39.0/24
 183.91.40.0/21
 183.91.44.0/24
